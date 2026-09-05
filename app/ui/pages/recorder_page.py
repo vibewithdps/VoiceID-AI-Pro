@@ -9,6 +9,8 @@ from app.audio.player import AudioPlayer
 from app.audio.recorder import VoiceRecorder
 from app.auth.auth_manager import AuthManager
 from app.auth.session import Session
+from app.ml.predictor import SpeakerPredictor
+import tkinter as tk
 
 
 class RecorderPage(ctk.CTkFrame):
@@ -24,6 +26,7 @@ class RecorderPage(ctk.CTkFrame):
         self.recording = False
         self.seconds = 0
         self.speaker_lookup = {}
+        self.predictor = SpeakerPredictor()
 
         self.build_ui()
 
@@ -80,14 +83,12 @@ class RecorderPage(ctk.CTkFrame):
         )
         self.timer.pack()
 
-        waveform = ctk.CTkFrame(self, height=120, corner_radius=15)
-        waveform.pack(fill="x", padx=30, pady=20)
+        self.waveform_frame = ctk.CTkFrame(self, height=120, corner_radius=15)
+        self.waveform_frame.pack(fill="x", padx=30, pady=20)
 
-        ctk.CTkLabel(
-            waveform,
-            text="📊 Audio Waveform\n(Coming Soon)",
-            font=("Segoe UI", 18)
-        ).pack(expand=True)
+        self.canvas = tk.Canvas(self.waveform_frame, height=120, highlightthickness=0, bg="#1E1E1E")
+        self.canvas.pack(fill="both", expand=True, padx=10, pady=10)
+        self.canvas.create_text(300, 50, text="📊 Ready to Record", fill="#666666", font=("Segoe UI", 14))
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(pady=20)
@@ -103,6 +104,9 @@ class RecorderPage(ctk.CTkFrame):
 
         self.delete_btn = ctk.CTkButton(buttons, text="🗑 Delete", width=140, state="disabled", command=self.delete_recording)
         self.delete_btn.grid(row=0, column=3, padx=10)
+        
+        self.predict_btn = ctk.CTkButton(buttons, text="🎯 Predict", width=140, state="disabled", command=self.predict_recording, fg_color="#27ae60", hover_color="#219653")
+        self.predict_btn.grid(row=0, column=4, padx=10)
 
         self.last_file = ctk.CTkLabel(self, text="Last Recording : None", font=("Segoe UI", 15))
         self.last_file.pack(pady=10)
@@ -151,12 +155,47 @@ class RecorderPage(ctk.CTkFrame):
         self.stop_btn.configure(state="disabled")
         self.play_btn.configure(state="normal" if self.filepath else "disabled")
         self.delete_btn.configure(state="normal" if self.filepath else "disabled")
+        self.predict_btn.configure(state="normal" if self.filepath else "disabled")
+        self.predict_btn.configure(state="normal" if self.filepath else "disabled")
 
         if self.filepath:
+            self.draw_waveform()
             self.last_file.configure(text=f"Last Recording : {self.filepath}")
             messagebox.showinfo("Success", "Recording Saved Successfully!")
         else:
             self.last_file.configure(text="Last Recording : None")
+
+
+    def draw_waveform(self):
+        self.canvas.delete("all")
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        if width <= 1:
+            width = 600
+        
+        envelope = self.recorder.waveform(width=width)
+        if not envelope:
+            self.canvas.create_text(width//2, height//2, text="No Audio Data", fill="#666666", font=("Segoe UI", 14))
+            return
+            
+        peak = max(envelope) if max(envelope) > 0 else 1.0
+        
+        for x, val in enumerate(envelope):
+            bar_height = (val / peak) * (height - 10)
+            y1 = (height - bar_height) / 2
+            y2 = (height + bar_height) / 2
+            self.canvas.create_line(x, y1, x, y2, fill="#4EA5FF", width=1)
+
+    def predict_recording(self):
+        if not self.filepath or not os.path.exists(self.filepath):
+            messagebox.showwarning("No File", "Please record audio first.")
+            return
+            
+        try:
+            result = self.predictor.predict(self.filepath)
+            messagebox.showinfo("Prediction Result", f"Speaker: {result.speaker}\nConfidence: {result.confidence:.2f}%")
+        except Exception as exc:
+            messagebox.showerror("Prediction Failed", str(exc))
 
     def stop_recording(self):
         self.status.configure(text="Stopping...")
@@ -203,6 +242,9 @@ class RecorderPage(ctk.CTkFrame):
             self.last_file.configure(text="Last Recording : None")
             self.play_btn.configure(state="disabled")
             self.delete_btn.configure(state="disabled")
+            self.predict_btn.configure(state="disabled")
+            self.canvas.delete("all")
+            self.canvas.create_text(300, 50, text="📊 Ready to Record", fill="#666666", font=("Segoe UI", 14))
             self.status.configure(text="🗑 Recording Deleted")
             self.timer.configure(text="00:00")
 
@@ -220,3 +262,4 @@ class RecorderPage(ctk.CTkFrame):
         self.stop_btn.configure(state="disabled")
         self.play_btn.configure(state="normal" if self.filepath else "disabled")
         self.delete_btn.configure(state="normal" if self.filepath else "disabled")
+        self.predict_btn.configure(state="normal" if self.filepath else "disabled")
