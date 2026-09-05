@@ -4,7 +4,7 @@ __pycache__/
 *.pyo
 
 models/
-database/
+/database/
 
 *.db
 
