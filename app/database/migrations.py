@@ -1,6 +1,5 @@
 from app.database.models import Setting
 
-
 DEFAULT_SETTINGS = (
     Setting("theme", "dark"),
     Setting("appearance", "dark"),
@@ -9,22 +8,27 @@ DEFAULT_SETTINGS = (
     Setting("model_selection", "random_forest"),
 )
 
+def _table_columns(db, table_name):
+    if db.is_postgres:
+        db.cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
+        return {row[0] for row in db.cursor.fetchall()}
+    else:
+        db.cursor.execute(f"PRAGMA table_info({table_name})")
+        return {row[1] for row in db.cursor.fetchall()}
 
-def _table_columns(cursor, table_name):
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    return {row[1] for row in cursor.fetchall()}
+def _add_column_if_missing(db, table_name, column_name, definition):
+    if column_name not in _table_columns(db, table_name):
+        db.cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
+def migrate_database(db):
+    if db.is_postgres:
+        pk_auto = "SERIAL PRIMARY KEY"
+    else:
+        pk_auto = "INTEGER PRIMARY KEY AUTOINCREMENT"
 
-def _add_column_if_missing(cursor, table_name, column_name, definition):
-    if column_name not in _table_columns(cursor, table_name):
-        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
-
-
-def migrate_database(cursor):
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_auto},
             full_name TEXT NOT NULL,
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
@@ -33,13 +37,11 @@ def migrate_database(cursor):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP
         )
-        """
-    )
+    """)
 
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS voice_samples (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_auto},
             user_id INTEGER NOT NULL,
             audio_path TEXT NOT NULL,
             duration REAL,
@@ -48,25 +50,21 @@ def migrate_database(cursor):
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(user_id, sample_number)
         )
-        """
-    )
+    """)
 
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS trained_models (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_auto},
             algorithm TEXT NOT NULL,
             accuracy REAL,
             model_path TEXT,
             trained_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        """
-    )
+    """)
 
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS prediction_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_auto},
             user_id INTEGER,
             file_name TEXT NOT NULL,
             predicted_speaker TEXT NOT NULL,
@@ -74,22 +72,18 @@ def migrate_database(cursor):
             prediction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
         )
-        """
-    )
+    """)
 
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
-        """
-    )
+    """)
 
-    cursor.execute(
-        """
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS recordings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_auto},
             user_id INTEGER NOT NULL,
             speaker TEXT NOT NULL,
             file_path TEXT NOT NULL,
@@ -97,18 +91,26 @@ def migrate_database(cursor):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
-        """
-    )
+    """)
 
-    _add_column_if_missing(cursor, "users", "role", "TEXT NOT NULL DEFAULT 'user'")
-    _add_column_if_missing(cursor, "users", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    _add_column_if_missing(cursor, "users", "last_login", "TIMESTAMP")
+    _add_column_if_missing(db, "users", "role", "TEXT NOT NULL DEFAULT 'user'")
+    _add_column_if_missing(db, "users", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    _add_column_if_missing(db, "users", "last_login", "TIMESTAMP")
 
     for setting in DEFAULT_SETTINGS:
-        cursor.execute(
-            """
-            INSERT OR IGNORE INTO settings (key, value)
-            VALUES (?, ?)
-            """,
-            (setting.key, setting.value),
-        )
+        if db.is_postgres:
+            db.execute(
+                """
+                INSERT INTO settings (key, value)
+                VALUES (?, ?) ON CONFLICT (key) DO NOTHING
+                """,
+                (setting.key, setting.value),
+            )
+        else:
+            db.execute(
+                """
+                INSERT OR IGNORE INTO settings (key, value)
+                VALUES (?, ?)
+                """,
+                (setting.key, setting.value),
+            )
