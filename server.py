@@ -97,9 +97,22 @@ def api_predict():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
+
         try:
             result = predictor.predict(filepath)
+            
+            # Log to Supabase prediction_history table
+            import datetime
+            try:
+                auth_manager.db.execute(
+                    "INSERT INTO prediction_history (user_id, file_name, predicted_speaker, confidence, prediction_time) VALUES (%s, %s, %s, %s, %s)",
+                    (session['user_id'], filename, result.speaker, result.confidence, datetime.datetime.utcnow().isoformat(timespec="seconds"))
+                )
+            except Exception as e:
+                print("Failed to save history:", e)
+                
             return jsonify({
+
                 'status': 'success',
                 'speaker': result.speaker,
                 'confidence': f"{result.confidence:.2f}%"
@@ -128,8 +141,21 @@ def api_save_dataset():
         count = len([name for name in os.listdir(speaker_dir) if os.path.isfile(os.path.join(speaker_dir, name))])
         filename = f"voice_{count+1:03d}.wav"
         filepath = os.path.join(speaker_dir, filename)
+
         file.save(filepath)
+        
+        # Log to Supabase voice_samples table
+        import datetime
+        try:
+            auth_manager.db.execute(
+                "INSERT INTO voice_samples (user_id, audio_path, sample_number, created_at) VALUES (%s, %s, %s, %s)",
+                (session.get('user_id', 1), filepath, count+1, datetime.datetime.utcnow().isoformat(timespec="seconds"))
+            )
+        except Exception as e:
+            print("Failed to save voice sample:", e)
+            
         return jsonify({'status': 'success', 'message': f'Saved sample for {speaker_name}'})
+
 
 @app.route('/api/dataset/train', methods=['POST'])
 def api_train_model():
