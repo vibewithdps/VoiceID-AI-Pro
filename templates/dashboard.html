@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - VoiceID AI Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .navbar { background-color: #212529; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .waveform { height: 100px; background: #e9ecef; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .nav-tabs .nav-link { color: #6c757d; font-weight: 500; }
+        .nav-tabs .nav-link.active { font-weight: 700; color: #0d6efd; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/"><i class="fa-solid fa-microphone-lines text-primary me-2"></i>VoiceID AI</a>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-light">Hello, {{ user_name }}</span>
+                <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                
+                <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="train-tab" data-bs-toggle="tab" data-bs-target="#train" type="button" role="tab">1. Add Voice & Train</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="predict-tab" data-bs-toggle="tab" data-bs-target="#predict" type="button" role="tab">2. Test Prediction</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="myTabContent">
+                    <!-- TRAIN TAB -->
+                    <div class="tab-pane fade show active" id="train" role="tabpanel">
+                        <div class="card p-5 text-center mb-4 border-primary border-top border-4">
+                            <h3 class="fw-bold mb-3">Add Voice to AI Database</h3>
+                            <p class="text-muted mb-4">Record samples for yourself or others, then train the AI.</p>
+                            
+                            <div class="mb-4 text-start">
+                                <label class="form-label fw-bold">Speaker Name:</label>
+                                <input type="text" id="speakerName" class="form-control form-control-lg" placeholder="e.g. Dipendra">
+                            </div>
+
+                            <div class="d-flex justify-content-center gap-3 mb-4">
+                                <button id="recordTrainBtn" class="btn btn-danger rounded-pill px-4 py-2 fw-medium">
+                                    <i class="fa-solid fa-circle me-2"></i> Record Sample
+                                </button>
+                                <button id="stopTrainBtn" class="btn btn-secondary rounded-pill px-4 py-2 fw-medium" disabled>
+                                    <i class="fa-solid fa-square me-2"></i> Stop
+                                </button>
+                            </div>
+
+                            <div class="waveform mb-3">
+                                <span id="statusTrainText" class="text-muted">Ready to record...</span>
+                            </div>
+
+                            <button id="saveDatasetBtn" class="btn btn-success btn-lg rounded-pill px-5 d-none w-100 mb-4">
+                                <i class="fa-solid fa-download me-2"></i> Save to Dataset
+                            </button>
+
+                            <hr>
+                            
+                            <div class="mt-4">
+                                <h5>Once you have added enough samples (at least 2 speakers):</h5>
+                                <button id="trainModelBtn" class="btn btn-dark btn-lg rounded-pill px-5 w-100 mt-2">
+                                    <i class="fa-solid fa-brain me-2"></i> Train AI Model
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PREDICT TAB -->
+                    <div class="tab-pane fade" id="predict" role="tabpanel">
+                        <div class="card p-5 text-center mb-4 border-success border-top border-4">
+                            <h3 class="fw-bold mb-4">🎤 Web Audio Recorder (Test)</h3>
+                            
+                            <div class="d-flex justify-content-center gap-3 mb-4">
+                                <button id="recordBtn" class="btn btn-danger rounded-pill px-4 py-2 fw-medium">
+                                    <i class="fa-solid fa-circle me-2"></i> Record
+                                </button>
+                                <button id="stopBtn" class="btn btn-secondary rounded-pill px-4 py-2 fw-medium" disabled>
+                                    <i class="fa-solid fa-square me-2"></i> Stop
+                                </button>
+                            </div>
+
+                            <div class="waveform mb-4">
+                                <span id="statusText" class="text-muted">Ready to record...</span>
+                            </div>
+
+                            <audio id="audioPlayback" controls class="w-100 d-none mb-4"></audio>
+
+                            <button id="predictBtn" class="btn btn-primary btn-lg rounded-pill px-5 d-none w-100">
+                                <i class="fa-solid fa-wand-magic-sparkles me-2"></i> Predict Speaker
+                            </button>
+                        </div>
+
+                        <div id="resultCard" class="card p-4 d-none text-center bg-dark text-white">
+                            <h5 class="text-muted text-uppercase tracking-wider mb-3" style="letter-spacing: 2px;">Prediction Result</h5>
+                            <h1 id="predSpeaker" class="display-4 fw-bold text-primary mb-2">Unknown</h1>
+                            <p id="predConfidence" class="lead mb-0">Confidence: 0%</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Shared Audio logic
+        let audioContext, mediaStreamSource, processor, stream;
+        let pcmData = [];
+        let isRecording = false;
+        let audioBlob = null;
+        let trainAudioBlob = null;
+
+        // Elements (Train)
+        const recordTrainBtn = document.getElementById('recordTrainBtn');
+        const stopTrainBtn = document.getElementById('stopTrainBtn');
+        const saveDatasetBtn = document.getElementById('saveDatasetBtn');
+        const statusTrainText = document.getElementById('statusTrainText');
+        const trainModelBtn = document.getElementById('trainModelBtn');
+        const speakerNameInput = document.getElementById('speakerName');
+
+        // Elements (Predict)
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const predictBtn = document.getElementById('predictBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const statusText = document.getElementById('statusText');
+        const resultCard = document.getElementById('resultCard');
+
+        async function startRecording(statusEl, rBtn, sBtn) {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                processor = audioContext.createScriptProcessor(4096, 1, 1);
+                
+                pcmData = [];
+                isRecording = true;
+                
+                processor.onaudioprocess = function(e) {
+                    if (!isRecording) return;
+                    pcmData.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+                };
+                
+                mediaStreamSource.connect(processor);
+                processor.connect(audioContext.destination);
+
+                statusEl.textContent = "🔴 Recording... Speak now.";
+                statusEl.classList.add('text-danger');
+                rBtn.disabled = true;
+                sBtn.disabled = false;
+            } catch (err) {
+                alert("Microphone access denied or error occurred.");
+            }
+        }
+
+        function stopRecording(statusEl, rBtn, sBtn) {
+            isRecording = false;
+            if (mediaStreamSource) mediaStreamSource.disconnect();
+            if (processor) processor.disconnect();
+            if (audioContext) audioContext.close();
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            
+            let length = 0;
+            pcmData.forEach(item => length += item.length);
+            let result = new Float32Array(length);
+            let offset = 0;
+            pcmData.forEach(item => { result.set(item, offset); offset += item.length; });
+            
+            statusEl.classList.remove('text-danger');
+            rBtn.disabled = false;
+            sBtn.disabled = true;
+            rBtn.textContent = "Record Again";
+
+            return encodeWAV(result, audioContext ? audioContext.sampleRate : 44100);
+        }
+
+        // --- TRAIN TAB LOGIC ---
+        recordTrainBtn.addEventListener('click', () => {
+            saveDatasetBtn.classList.add('d-none');
+            startRecording(statusTrainText, recordTrainBtn, stopTrainBtn);
+        });
+
+        stopTrainBtn.addEventListener('click', () => {
+            trainAudioBlob = stopRecording(statusTrainText, recordTrainBtn, stopTrainBtn);
+            statusTrainText.textContent = "Recording saved! Ready to add to dataset.";
+            saveDatasetBtn.classList.remove('d-none');
+        });
+
+        saveDatasetBtn.addEventListener('click', async () => {
+            const name = speakerNameInput.value.trim();
+            if (!name) return alert("Please enter a speaker name first!");
+            if (!trainAudioBlob) return alert("Please record something first!");
+            
+            const formData = new FormData();
+            formData.append('audio', trainAudioBlob, 'train_sample.wav');
+            formData.append('speaker_name', name);
+
+            saveDatasetBtn.disabled = true;
+            saveDatasetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Saving...';
+
+            try {
+                const res = await fetch('/api/dataset/save', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Sample saved successfully for ${name}! (Add a few more samples for better accuracy)`);
+                    saveDatasetBtn.classList.add('d-none');
+                    statusTrainText.textContent = "Ready to record another sample...";
+                } else {
+                    alert(data.message || "Failed to save");
+                }
+            } catch (err) {
+                alert("Connection error");
+            } finally {
+                saveDatasetBtn.disabled = false;
+                saveDatasetBtn.innerHTML = '<i class="fa-solid fa-download me-2"></i> Save to Dataset';
+            }
+        });
+
+        trainModelBtn.addEventListener('click', async () => {
+            trainModelBtn.disabled = true;
+            trainModelBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Training AI Model... Please wait.';
+
+            try {
+                const res = await fetch('/api/dataset/train', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("SUCCESS: " + data.message);
+                } else {
+                    alert("Training Error: " + (data.message || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Connection error during training");
+            } finally {
+                trainModelBtn.disabled = false;
+                trainModelBtn.innerHTML = '<i class="fa-solid fa-brain me-2"></i> Train AI Model';
+            }
+        });
+
+        // --- PREDICT TAB LOGIC ---
+        recordBtn.addEventListener('click', () => {
+            predictBtn.classList.add('d-none');
+            resultCard.classList.add('d-none');
+            audioPlayback.classList.add('d-none');
+            startRecording(statusText, recordBtn, stopBtn);
+        });
+
+        stopBtn.addEventListener('click', () => {
+            audioBlob = stopRecording(statusText, recordBtn, stopBtn);
+            statusText.textContent = "Recording saved!";
+            
+            const audioUrl = URL.createObjectURL(audioBlob);
+            audioPlayback.src = audioUrl;
+            audioPlayback.classList.remove('d-none');
+            predictBtn.classList.remove('d-none');
+        });
+
+        predictBtn.addEventListener('click', async () => {
+            if (!audioBlob) return;
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'web_recording.wav');
+
+            predictBtn.disabled = true;
+            predictBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Analyzing...';
+
+            try {
+                const res = await fetch('/api/predict', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('predSpeaker').textContent = data.speaker;
+                    document.getElementById('predConfidence').textContent = data.confidence;
+                    resultCard.classList.remove('d-none');
+                } else {
+                    alert(data.message || "Prediction failed");
+                }
+            } catch (err) {
+                alert("Connection error");
+            } finally {
+                predictBtn.disabled = false;
+                predictBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-2"></i> Predict Speaker';
+            }
+        });
+
+        // WAV Encoder
+        function encodeWAV(samples, sampleRate) {
+            let buffer = new ArrayBuffer(44 + samples.length * 2);
+            let view = new DataView(buffer);
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + samples.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, samples.length * 2, true);
+            let offset = 44;
+            for (let i = 0; i < samples.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

@@ -77,27 +77,12 @@ class FeatureExtractor:
 	def _extract_without_librosa(audio, sample_rate):
 		if audio.ndim > 1:
 			audio = np.mean(audio, axis=1)
-
-		frame_count = max(int(sample_rate * 0.02), 1)
-		frames = []
-
-		for index in range(0, len(audio), frame_count):
-			frame = audio[index:index + frame_count]
-			if len(frame) == 0:
-				continue
-			frames.append(
-				[
-					float(np.mean(frame)),
-					float(np.std(frame)),
-					float(np.max(frame)),
-					float(np.min(frame)),
-					float(np.mean(np.abs(np.diff(frame)))) if len(frame) > 1 else 0.0,
-				]
-			)
-
-		if not frames:
-			return np.zeros(5, dtype=np.float32)
-
-		summary = np.array(frames, dtype=np.float32)
-		return np.hstack([summary.mean(axis=0), summary.std(axis=0), summary.max(axis=0), summary.min(axis=0)]).astype(np.float32)
+		
+		try:
+			from python_speech_features import mfcc
+			features_mfcc = mfcc(audio, sample_rate, numcep=40, nfft=2048)
+			return np.mean(features_mfcc, axis=0).astype(np.float32)
+		except ImportError:
+			# Absolute fallback if python_speech_features is not installed
+			return np.zeros(40, dtype=np.float32)
 
